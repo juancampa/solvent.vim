@@ -25,4 +25,5 @@ If you work in a team that uses Visual Studio but you want to use vim instead th
  * Tree coloring
  * Persist status in some kind of "solvent.suo" (?) file
  * Editing of the project/solution (adding/removing files)
+ * Check/Add support for other proj files (C#, VB, and so forth)
  * Item properties
