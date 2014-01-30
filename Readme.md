@@ -3,6 +3,10 @@ Solvent.vim
 
 Let's you use Visual Studio solutions from Vim. The solution structure is displayed in a tree similar to NERDTree but with the contents of the solution's file hierarchy.
 
+## Why?
+
+If you work in a team that uses Visual Studio but you want to use vim instead this plugin is for you
+
 ## Requirements
 
  * Vim 7.4 (not yet tested with other versions)
