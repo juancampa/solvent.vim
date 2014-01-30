@@ -139,13 +139,43 @@ class SolutionView:
                 else:
                     self.__RenderTree(child, depth + 0)
 
-    def OnEnterPressed(self):
+    def GetSelected(self):
+        cursor = VimUtil.GetCursor()
+        return self.lineToNodeMapping[cursor[0]]
+
+    def PerformAction(self, action):
+        """Forwards the action to the currently selected node"""
         assert vim.current.window == self.window
         assert vim.current.buffer == self.buffer
-        cursor = VimUtil.GetCursor()
 
-        self.lineToNodeMapping[cursor[0]].OnEnterPressed()
+        # Forward the action to the currently selected node
+        selected = self.GetSelected()
+        selected.PerformAction(action)
+
+        # Actions that apply to all nodes
+        if action == Actions.ExpandAll: 
+            for n in self.lineToNodeMapping.values(): 
+                n.PerformAction(Actions.Expand) 
+        if action == Actions.CollapseAll: 
+            for n in self.lineToNodeMapping.values(): 
+                n.PerformAction(Actions.Collapse) 
+        if action == Actions.ExpandOrCollapseAll: 
+            for n in self.lineToNodeMapping.values(): 
+                n.PerformAction(Actions.ExpandOrCollapse) 
+
+        # Actions that apply to all descendants
+        if action == Actions.ExpandDescendants: 
+            self.__PerformInDescendants(selected, Actions.Expand)
+        if action == Actions.CollapseDescendants: 
+            self.__PerformInDescendants(selected, Actions.Collapse)
+
+        # Render again because something probably changed
         self.Render()
+
+    def __PerformInDescendants(self, node, action):
+        node.PerformAction(action)
+        for c in node.children:
+            self.__PerformInDescendants(c, action)
 
 class TreeNode:
     """Base class for all elements on the tree"""
@@ -169,7 +199,7 @@ class TreeNode:
     def IndentsChildren(self):
         return True
 
-    def OnEnterPressed(self):
+    def PerformAction(self, action):
         pass
 
 class ProjectDef:
@@ -201,8 +231,10 @@ class Folder(TreeNode):
     def GetDisplayName(self):
         return self.ame + "/"
 
-    def OnEnterPressed(self):
-        self.expanded = not self.expanded
+    def PerformAction(self, action):
+        if action == Actions.Expand: self.expanded = True
+        if action == Actions.Collapse: self.expanded = False
+        if action == Actions.ExpandOrCollapse: self.expanded = not self.expanded
 
 class File(TreeNode):
     def __init__(self, filepath):
@@ -213,7 +245,7 @@ class File(TreeNode):
     def GetNodeName(self):
         return self.filename
 
-class Project(TreeNode):
+class Project(Folder):
     def __init__(self, definition):
         TreeNode.__init__(self)
         self.definition = definition
@@ -296,7 +328,7 @@ class Project(TreeNode):
     def IndentsChildren(self):
         return False
 
-class Solution(TreeNode):
+class Solution(Folder):
     """Represents a VS solution (i.e. .sln file)"""
 
     def __init__(self, filepath):
@@ -377,14 +409,30 @@ class Solution(TreeNode):
     def IndentsChildren(self):
         return False
 
+class Actions:
+    """Actions that can be mapped to a key"""
+    Expand                  = 1
+    Collapse                = 2
+    ExpandOrCollapse        = 3
+    ExpandAll               = 4
+    CollapseAll             = 5
+    ExpandOrCollapseAll     = 6
+    ExpandDescendants       = 7
+    CollapseDescendants     = 8
+    OpenFile                = 9
+    OpenFileInVertSplit     = 10
+    OpenFileInHoriSplit     = 11
+
 class Solvent:
     view = None
 
     @staticmethod
     def StartPlugin():
         """Initializes the plugin, this method should only be called once or bad things might happen?"""
-        sln = Solution("../../Eons/Eons.sln")
 
+        Solvent.actionMappings = {}
+        
+        sln = Solution("../../Eons/Eons.sln")
         Solvent.view = SolutionView(sln)
 
         vim.command("augroup Solvent")
@@ -396,13 +444,55 @@ class Solvent:
         Solvent.view.EnsureOpen()
         Solvent.view.Render()
 
-    @staticmethod
-    def SetKeyBindings():
-        VimUtil.Map("i,I,a,A,o,O,r,R,c,C,d,D", "<Esc>", MapScopes.All)
-        VimUtil.Map("<Cr>", ":python Solvent.OnEnterPressed()<Cr>", MapScopes.All)
+        # Default mappings
+        Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile")
+        Solvent.MapKey("o",         "Expand")
+        Solvent.MapKey("O",         "ExpandDescendants")
+        Solvent.MapKey("c",         "Collapse")
+        Solvent.MapKey("C",         "CollapseDescendants")
+        Solvent.MapKey("<C-CR>",    "ExpandOrCollapse,OpenFileInVertSplit")
+        Solvent.MapKey("zo",        "Expand")
+        Solvent.MapKey("zc",        "Collapse")
+        Solvent.MapKey("za",        "ExpandOrCollapse")
+        Solvent.MapKey("zO",        "ExpandAll")
+        Solvent.MapKey("zC",        "CollapseAll")
+        Solvent.MapKey("zA",        "ExpandOrCollapseAll")
+        Solvent.MapKey("<space>",   "ExpandOrCollapse")
 
     @staticmethod
-    def OnEnterPressed():
-        Solvent.view.OnEnterPressed()
+    def SetKeyBindings():
+        # Default mappings
+        # VimUtil.Map("i,I,a,A,o,O,r,R,c,C,d,D", "<Esc>", MapScopes.All)
+
+        # Default + user defined mappings
+        for k in Solvent.actionMappings.keys():
+            print "mapping: " + k + " to " + Solvent.actionMappings[k]
+            VimUtil.Map(k, ":python Solvent.PerformAction(\"%s\")<Cr>" % Solvent.actionMappings[k], MapScopes.All)
+
+    @staticmethod
+    def MapKey(key, actions):
+        Solvent.actionMappings[key] = actions
+
+    @staticmethod
+    def PerformAction(actions):
+        actions = actions.split(",")
+
+        for action in actions:
+            actionNum = 0
+            action = action.strip().lower()
+            if action == "expand": actionNum = Actions.Expand
+            if action == "collapse": actionNum = Actions.Collapse
+            if action == "expandorcollapse": actionNum = Actions.ExpandOrCollapse
+            if action == "expandall": actionNum = Actions.ExpandAll
+            if action == "collapseall": actionNum = Actions.CollapseAll
+            if action == "expandorcollapseall": actionNum = Actions.ExpandOrCollapseAll
+            if action == "expanddescendants": actionNum = Actions.ExpandDescendants
+            if action == "collapsedescendants": actionNum = Actions.CollapseDescendants
+            if action == "openfile": actionNum = Actions.OpenFile
+            if action == "openfileinvertsplit": actionNum = Actions.OpenFileInVertSplit
+            if action == "openfileinhorisplit": actionNum = Actions.OpenFileInHoriSplit
+
+            if actionNum > 0:
+                Solvent.view.PerformAction(actionNum)
 
 Solvent.StartPlugin()
