@@ -141,7 +141,10 @@ class SolutionView:
 
     def GetSelected(self):
         cursor = VimUtil.GetCursor()
-        return self.lineToNodeMapping[cursor[0]]
+        if cursor[0] in self.lineToNodeMapping:
+            return self.lineToNodeMapping[cursor[0]]
+        else:
+            return None
 
     def PerformAction(self, action):
         """Forwards the action to the currently selected node"""
@@ -150,7 +153,14 @@ class SolutionView:
 
         # Forward the action to the currently selected node
         selected = self.GetSelected()
-        selected.PerformAction(action)
+        if selected != None:
+            selected.PerformAction(action)
+
+            # Actions that apply to all descendants of the selected node
+            if action == Actions.ExpandDescendants: 
+                self.__PerformInDescendants(selected, Actions.Expand)
+            if action == Actions.CollapseDescendants: 
+                self.__PerformInDescendants(selected, Actions.Collapse)
 
         # Actions that apply to all nodes
         if action == Actions.ExpandAll: 
@@ -162,12 +172,6 @@ class SolutionView:
         if action == Actions.ExpandOrCollapseAll: 
             for n in self.lineToNodeMapping.values(): 
                 n.PerformAction(Actions.ExpandOrCollapse) 
-
-        # Actions that apply to all descendants
-        if action == Actions.ExpandDescendants: 
-            self.__PerformInDescendants(selected, Actions.Expand)
-        if action == Actions.CollapseDescendants: 
-            self.__PerformInDescendants(selected, Actions.Collapse)
 
         # Render again because something probably changed
         self.Render()
@@ -203,12 +207,16 @@ class TreeNode:
         pass
 
 class ProjectDef:
+    """Project information as it's read from the sln file"""
     @staticmethod
     def TranslateProjectType(type):
         """Utility function to transform project type UUIDs into a human readable string"""
         if type == "{2150E333-8FDC-42A3-9474-1A3956D46DE8}":
             return "general"
         elif type == "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}":
+            return "cpp"
+        else:
+            print "WARNING: Unknown project type: " + type
             return "cpp"
 
     def __init__(self, solution, type, name, filepath, uuid):
@@ -217,6 +225,7 @@ class ProjectDef:
         self.name = name
         self.filepath = filepath
         self.absolutePath = os.path.join(solution.solutionDir, filepath)
+        self.absoluteDirPath = os.path.dirname(self.absolutePath)
         self.uuid = uuid
         self.parentuuid = None
 
@@ -237,13 +246,20 @@ class Folder(TreeNode):
         if action == Actions.ExpandOrCollapse: self.expanded = not self.expanded
 
 class File(TreeNode):
-    def __init__(self, filepath):
+    def __init__(self, project, relativeFilepath):
         TreeNode.__init__(self)
-        self.filepath = filepath
-        self.filename = os.path.basename(filepath)
+        self.project = project
+        self.relativeFilepath = relativeFilepath
+        self.filename = os.path.basename(self.relativeFilepath)
 
     def GetNodeName(self):
         return self.filename
+
+    def PerformAction(self, action):
+        if action == Actions.OpenFile:
+            if vim.current.window != None and vim.current.window.valid:
+                vim.current.window = Solvent.lastWindow
+            vim.command("edit " + os.path.join(self.project.definition.absoluteDirPath, self.relativeFilepath))
 
 class Project(Folder):
     def __init__(self, definition):
@@ -255,6 +271,7 @@ class Project(Folder):
         if (definition.type == "general"):
             pass
 
+        # TODO: Add support for other kinds of projects. Do I need to make a distinction??
         if (definition.type == "cpp"):
             try:
                 # First try to open the filter file which is the tree we prefer to show
@@ -288,15 +305,6 @@ class Project(Folder):
                         if i.get("Include") != None:
                             self.__ReadFile(i)
 
-            # Get all cpp files
-            # self.codeFiles = root.findall(".//{%s}ItemGroup//{%s}ClCompile" % (self.xmlns, self.xmlns));
-            # Get all include files
-            # self.includeFiles = root.findall(".//{%s}ItemGroup//{%s}ClInclude" % (self.xmlns, self.xmlns));
-
-            # for f in self.codeFiles:
-            #     self.children.append(File(f.get("Include")))
-            #print str(len(self.codeFiles)) + " code files. " + str(len(self.includeFiles)) + " include files."
-
         self.loaded = True
 
     def __ReadFile(self, item):
@@ -309,7 +317,7 @@ class Project(Folder):
             folder = self.GetOrCreateFolder(filter)
         else:
             folder = self
-        folder.children.append(File(filepath))
+        folder.children.append(File(self, filepath))
 
     def GetOrCreateFolder(self, path):
         folders = path.split("\\")
@@ -432,13 +440,14 @@ class Solvent:
 
         Solvent.actionMappings = {}
         
-        sln = Solution("../../Eons/Eons.sln")
+        sln = Solution("../../Auralux/Code/WarEngine.sln")
         Solvent.view = SolutionView(sln)
 
         vim.command("augroup Solvent")
         vim.command("autocmd!")
         vim.command("autocmd BufEnter %s* stopinsert" % (Solvent.view.bufferName))
         vim.command("autocmd BufEnter %s* python Solvent.SetKeyBindings()" % (Solvent.view.bufferName))
+        vim.command("autocmd WinLeave * python Solvent.OnWinLeave()")
         vim.command("augroup END")
 
         Solvent.view.EnsureOpen()
@@ -446,8 +455,8 @@ class Solvent:
 
         # Default mappings
         Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile")
-        Solvent.MapKey("o",         "Expand")
-        Solvent.MapKey("O",         "ExpandDescendants")
+        Solvent.MapKey("o",         "Expand,OpenFile")
+        Solvent.MapKey("O",         "ExpandDescendants,OpenFile")
         Solvent.MapKey("c",         "Collapse")
         Solvent.MapKey("C",         "CollapseDescendants")
         Solvent.MapKey("<C-CR>",    "ExpandOrCollapse,OpenFileInVertSplit")
@@ -459,6 +468,8 @@ class Solvent:
         Solvent.MapKey("zA",        "ExpandOrCollapseAll")
         Solvent.MapKey("<space>",   "ExpandOrCollapse")
 
+        Solvent.SetKeyBindings()
+
     @staticmethod
     def SetKeyBindings():
         # Default mappings
@@ -466,8 +477,12 @@ class Solvent:
 
         # Default + user defined mappings
         for k in Solvent.actionMappings.keys():
-            print "mapping: " + k + " to " + Solvent.actionMappings[k]
             VimUtil.Map(k, ":python Solvent.PerformAction(\"%s\")<Cr>" % Solvent.actionMappings[k], MapScopes.All)
+
+    @staticmethod
+    def OnWinLeave():
+        # Keep the last window so when a file is opened we open it there.
+        Solvent.lastWindow = vim.current.window
 
     @staticmethod
     def MapKey(key, actions):
