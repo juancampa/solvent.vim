@@ -48,7 +48,7 @@ class SolutionView:
         self.buffer = None
         self.solution = solution
         self.bufferName = "sln-vim-buffer-name"     # Just some name nobody else would ever use
-        self.defaultBufferWidth = 25
+        self.defaultBufferWidth = 32
         self.lineToNodeMapping = {}
 
     def IsOpen(self):
@@ -174,7 +174,8 @@ class SolutionView:
                 n.PerformAction(Actions.ExpandOrCollapse) 
 
         # Render again because something probably changed
-        self.Render()
+        if vim.current.window == self.window:
+            self.Render()
 
     def __PerformInDescendants(self, node, action):
         node.PerformAction(action)
@@ -296,14 +297,18 @@ class Project(Folder):
             for g in itemGroups:
                 # TODO: Apparently if it doesn't have a label then it's a group of 
                 # files we want to show? There's probably a better way to determine that
-                if g.get("Label") == None:
-                    for i in g:
-                        # Ignore filters since each file's filter specify the same information
-                        if i.tag == ("{%s}Filter" % (self.xmlns)):
-                            continue
-                        # All items I've seen have the Include property but just to make sure
-                        if i.get("Include") != None:
-                            self.__ReadFile(i)
+                if g.get("Label") != None:
+                    continue
+                for i in g:
+                    # Ignore filters since each file's filter specify the same information
+                    if i.tag == ("{%s}Filter" % (self.xmlns)):
+                        continue
+                    # Ignore project references (this are project dependencies, maybe we want those?)
+                    if i.tag == ("{%s}ProjectReference" % (self.xmlns)):
+                        continue
+                    # All items I've seen have the Include property but just to make sure
+                    if i.get("Include") != None:
+                        self.__ReadFile(i)
 
         self.loaded = True
 
@@ -334,7 +339,7 @@ class Project(Folder):
         return "[%s]" % self.definition.name
 
     def IndentsChildren(self):
-        return False
+        return True
 
 class Solution(Folder):
     """Represents a VS solution (i.e. .sln file)"""
@@ -440,7 +445,9 @@ class Solvent:
 
         Solvent.actionMappings = {}
         
-        sln = Solution("../../Auralux/Code/WarEngine.sln")
+        # sln = Solution("../../Auralux/Code/WarEngine.sln")
+        # sln = Solution("../../OSWrapper/OSWrapper.sln")
+        sln = Solution("F:\ChavoKart\Development\Src\UE3.sln")
         Solvent.view = SolutionView(sln)
 
         vim.command("augroup Solvent")
