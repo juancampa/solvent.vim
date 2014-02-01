@@ -9,7 +9,7 @@ If you work in a team that uses Visual Studio but you want to use vim instead th
 
 ## Requirements
 
- * Vim 7.4 (not yet tested with other versions)
+ * Vim 7.4 (not yet tested with other versions but it might work at least with 7.3.596)
  * Python support compiled into Vim
 
 ## Status
@@ -25,6 +25,7 @@ The following is a list of features to be implemented in the order they are prob
  * ~~Read C++ .vcxproj and related .filter~~ (Only tested with VS 2010 format for now)
  * ~~Key mapping system~~
  * ~~Actually open files in project~~ Files are currently opened in the last used window
+ * CtrlP extension for fuzzy search within the solution
  * Tree coloring
  * Persist status in some kind of "solvent.suo" (?) file
  * Editing of the project/solution (adding/removing files)
@@ -32,3 +33,4 @@ The following is a list of features to be implemented in the order they are prob
  * Enable building from Vim using MSBuild
  * Check/Add support for other proj files (C#, VB, and so forth)
  * Item properties (i.e. property window)
+ * Add support for other project formats (e.g. xcodeproj and so forth)

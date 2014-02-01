@@ -220,12 +220,13 @@ class ProjectDef:
             print "WARNING: Unknown project type: " + type
             return "cpp"
 
-    def __init__(self, solution, type, name, filepath, uuid):
+    def __init__(self, solution, type, name, path, uuid):
         self.solution = solution
         self.type = ProjectDef.TranslateProjectType(type)
         self.name = name
-        self.filepath = filepath
-        self.absolutePath = os.path.join(solution.solutionDir, filepath)
+        self.path = path
+        self.filename = os.path.basename(path)
+        self.absolutePath = os.path.join(solution.solutionDir, path)
         self.absoluteDirPath = os.path.dirname(self.absolutePath)
         self.uuid = uuid
         self.parentuuid = None
@@ -247,11 +248,11 @@ class Folder(TreeNode):
         if action == Actions.ExpandOrCollapse: self.expanded = not self.expanded
 
 class File(TreeNode):
-    def __init__(self, project, relativeFilepath):
+    def __init__(self, project, relativePath):
         TreeNode.__init__(self)
         self.project = project
-        self.relativeFilepath = relativeFilepath
-        self.filename = os.path.basename(self.relativeFilepath)
+        self.relativePath = relativePath
+        self.filename = os.path.basename(self.relativePath)
 
     def GetNodeName(self):
         return self.filename
@@ -260,12 +261,14 @@ class File(TreeNode):
         if action == Actions.OpenFile:
             if vim.current.window != None and vim.current.window.valid:
                 vim.current.window = Solvent.lastWindow
-            vim.command("edit " + os.path.join(self.project.definition.absoluteDirPath, self.relativeFilepath))
+            vim.command("edit " + os.path.join(self.project.definition.absoluteDirPath, self.relativePath))
 
 class Project(Folder):
     def __init__(self, definition):
         TreeNode.__init__(self)
         self.definition = definition
+        self.solution = definition.solution
+        self.files = []
 
         #print "Loading " + definition.type + " project at: " + definition.absolutePath
         # Is there an actual file related to this project?
@@ -315,16 +318,19 @@ class Project(Folder):
     def __ReadFile(self, item):
         """Reads a file from xml and creates a corresponding File object in the
         right folder (according to its filter)"""
-        filepath = item.get("Include")
+        path = item.get("Include")
         filter = item.find("{%s}Filter" % self.xmlns)
         if filter != None:
             filter = filter.text
-            folder = self.GetOrCreateFolder(filter)
+            folder = self.__GetOrCreateFolder(filter)
         else:
             folder = self
-        folder.children.append(File(self, filepath))
 
-    def GetOrCreateFolder(self, path):
+        file = File(self, path)
+        folder.children.append(file)
+        self.files.append(file)
+
+    def __GetOrCreateFolder(self, path):
         folders = path.split("\\")
         node = self
         for folderName in folders:
@@ -335,6 +341,14 @@ class Project(Folder):
             node = child
         return node
 
+    def GetProjectId(self):
+        """Returns the project id of this project, we need an id because 
+        different projects might use the same name"""
+        for i in range(0, len(self.solution.projects)):
+            if self.solution.projects[i] == self:
+                return i
+        return -1
+
     def GetNodeName(self):
         return "[%s]" % self.definition.name
 
@@ -344,18 +358,18 @@ class Project(Folder):
 class Solution(Folder):
     """Represents a VS solution (i.e. .sln file)"""
 
-    def __init__(self, filepath):
+    def __init__(self, path):
         TreeNode.__init__(self)
         # Read the whole solution into a string
         try:
-            with open(filepath, 'r') as content_file:
+            with open(path, 'r') as content_file:
                 raw = content_file.read()
         except Exception as e:
             print "The solution file could not be read. Aborting."
             print e
             return
-        self.solutionDir = os.path.dirname(filepath)
-        self.name = os.path.basename(filepath)
+        self.solutionDir = os.path.dirname(path)
+        self.name = os.path.basename(path)
 
         # Find out the version of the solution
         try:
@@ -372,9 +386,9 @@ class Solution(Folder):
             projectStrings = re.findall("^Project.*?^EndProject$", raw, re.DOTALL | re.MULTILINE)
             self.projectDefs = []
             for p in projectStrings:
-                m = re.match("Project\(\"(?P<type>.*?)\"\) *= *\"(?P<name>.*?)\" *, *\"(?P<filepath>.*?)\" *, *\"(?P<uuid>.*?)\"", p)
-                # print m.group("type") + ": " + m.group("name") + ", " + m.group("filepath") + ", " + m.group("uuid")
-                self.projectDefs.append(ProjectDef(self, m.group("type"), m.group("name"), m.group("filepath"), m.group("uuid")))
+                m = re.match("Project\(\"(?P<type>.*?)\"\) *= *\"(?P<name>.*?)\" *, *\"(?P<path>.*?)\" *, *\"(?P<uuid>.*?)\"", p)
+                # print m.group("type") + ": " + m.group("name") + ", " + m.group("path") + ", " + m.group("uuid")
+                self.projectDefs.append(ProjectDef(self, m.group("type"), m.group("name"), m.group("path"), m.group("uuid")))
         except Exception as e:
             print ("The projects in the solution are not in the expected format, please send the solution file to juancampa "
                   "at gmail dot com so the plugin can be enhanced, thanks! Aborting. Also please include the following error:")
@@ -440,14 +454,13 @@ class Solvent:
     view = None
 
     @staticmethod
-    def StartPlugin():
+    def StartPlugin(solutionPath):
         """Initializes the plugin, this method should only be called once or bad things might happen?"""
 
         Solvent.actionMappings = {}
         
         # sln = Solution("../../Auralux/Code/WarEngine.sln")
-        # sln = Solution("../../OSWrapper/OSWrapper.sln")
-        sln = Solution("F:\ChavoKart\Development\Src\UE3.sln")
+        sln = Solution(solutionPath)
         Solvent.view = SolutionView(sln)
 
         vim.command("augroup Solvent")
@@ -517,4 +530,15 @@ class Solvent:
             if actionNum > 0:
                 Solvent.view.PerformAction(actionNum)
 
-Solvent.StartPlugin()
+    @staticmethod
+    def GetCtrlPFileList():
+        """Return the complete list of files to vimscript to be used inside ctrlp"""
+        result = []
+        if Solvent.view != None and Solvent.view.solution != None:
+            for p in Solvent.view.solution.projects:
+                for f in p.files:
+                    result.append(f.relativePath + " \t(in " + p.definition.name + " #" + str(p.GetProjectId()) + ")")
+        return vim.List(result)
+            
+
+Solvent.StartPlugin(vim.current.buffer.name)
