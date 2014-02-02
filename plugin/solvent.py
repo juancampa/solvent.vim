@@ -502,7 +502,8 @@ class Solvent:
     @staticmethod
     def OnWinLeave():
         # Keep the last window so when a file is opened we open it there.
-        Solvent.lastWindow = vim.current.window
+        if Solvent.view != None and Solvent.view.window != vim.current.window:
+            Solvent.lastWindow = vim.current.window
 
     @staticmethod
     def MapKey(key, actions):
@@ -526,7 +527,6 @@ class Solvent:
             if action == "openfile": actionNum = Actions.OpenFile
             if action == "openfileinvertsplit": actionNum = Actions.OpenFileInVertSplit
             if action == "openfileinhorisplit": actionNum = Actions.OpenFileInHoriSplit
-
             if actionNum > 0:
                 Solvent.view.PerformAction(actionNum)
 
@@ -536,9 +536,27 @@ class Solvent:
         result = []
         if Solvent.view != None and Solvent.view.solution != None:
             for p in Solvent.view.solution.projects:
-                for f in p.files:
-                    result.append(f.relativePath + " \t(in " + p.definition.name + " #" + str(p.GetProjectId()) + ")")
+                pid = p.GetProjectId()
+                projectName = p.definition.name
+                for i in range(0, len(p.files)):
+                    f = p.files[i]
+                    result.append(f.relativePath + " \t(in " + projectName + ") (id:" + str(pid) + "-" + str(i) + ")")
         return vim.List(result)
-            
+
+    @staticmethod
+    def AcceptCtrlPStr():
+        """Processes the result of a ctrlp search by opening the selected file"""
+        # Parameters for this function are passed through a global var to avoid having
+        # problems with special characters
+        mode = vim.vars["solvent_strParam1"]
+        line = vim.vars["solvent_strParam2"]
+
+        # Extract the id from the string which uniquely identifies each file
+        m = re.search("\(id:([0-9]*)-([0-9]*)\)$", line)
+        projectIndex = int(m.group(1))
+        fileIndex = int(m.group(2))
+
+        # Open the file
+        Solvent.view.solution.projects[projectIndex].files[fileIndex].PerformAction(Actions.OpenFile)
 
 Solvent.StartPlugin(vim.current.buffer.name)
