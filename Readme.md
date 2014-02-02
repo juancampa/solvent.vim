@@ -21,19 +21,21 @@ If you work in a team that uses Visual Studio but you want to use vim instead th
 
  * Open a .sln file in Vim and run `:Dissolve` this will open a window showing all projects and files. The default mappings for this buffer are:
 
-    Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile")
-    Solvent.MapKey("o",         "Expand,OpenFile")
-    Solvent.MapKey("O",         "ExpandDescendants,OpenFile")
-    Solvent.MapKey("c",         "Collapse")
-    Solvent.MapKey("C",         "CollapseDescendants")
-    Solvent.MapKey("<C-CR>",    "ExpandOrCollapse,OpenFileInVertSplit")
-    Solvent.MapKey("zo",        "Expand")
-    Solvent.MapKey("zc",        "Collapse")
-    Solvent.MapKey("za",        "ExpandOrCollapse")
-    Solvent.MapKey("zO",        "ExpandAll")
-    Solvent.MapKey("zC",        "CollapseAll")
-    Solvent.MapKey("zA",        "ExpandOrCollapseAll")
-    Solvent.MapKey("<space>",   "ExpandOrCollapse")
+```python
+Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile")
+Solvent.MapKey("o",         "Expand,OpenFile")
+Solvent.MapKey("O",         "ExpandDescendants,OpenFile")
+Solvent.MapKey("c",         "Collapse")
+Solvent.MapKey("C",         "CollapseDescendants")
+Solvent.MapKey("<C-CR>",    "ExpandOrCollapse,OpenFileInVertSplit")
+Solvent.MapKey("zo",        "Expand")
+Solvent.MapKey("zc",        "Collapse")
+Solvent.MapKey("za",        "ExpandOrCollapse")
+Solvent.MapKey("zO",        "ExpandAll")
+Solvent.MapKey("zC",        "CollapseAll")
+Solvent.MapKey("zA",        "ExpandOrCollapseAll")
+Solvent.MapKey("<space>",   "ExpandOrCollapse")
+```
 
  * If you have [CtrlP](https://github.com/kien/ctrlp.vim) installed, you can use `:CtrlPCmdSolvent` to search through solution files
 
