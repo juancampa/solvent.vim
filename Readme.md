@@ -44,19 +44,19 @@ Solvent.MapKey("<space>",   "ExpandOrCollapse,ToggleOption")
 
 The following is a list of features to be implemented in the order they are probably going to get implemented. If you think the list need another item(s) or reordering just let me know.
 
- * [x] Read sln (Only tested with VS 2010 .sln files for now)
- * [x] Read C++ .vcxproj and related .filter (Only tested with VS 2010 format for now)
- * [x] Key mapping system
- * [x] Actually open files in project Files are currently opened in the last used window
- * [x] CtrlP extension for fuzzy search within the solution Use command :CtrlPCmdSolvent (see above)
- * [ ] Enable building from Vim using MSBuild (Work in progress)
- * [ ] Tree coloring
- * [ ] Persist status in some kind of "<solutionname>.solvent.suo" file
- * [ ] Unite.vim integration
- * [ ] Editing of the project/solution (adding/removing files)
- * [x] Read the available Configurations/Platforms for projects and solution
- * [ ] Check/Add support for other proj files (C#, VB, and so forth). This seem to already work for most projects types.
- * [ ] Item properties (i.e. property window)
- * [ ] Add support for other project formats (e.g. xcodeproj and so forth)
- * [ ] Support the workflow where the solution tree is shown temporarily in the current buffer instead of another window
- * [ ] Write vim docs
+ - [x] Read sln (Only tested with VS 2010 .sln files for now)
+ - [x] Read C++ .vcxproj and related .filter (Only tested with VS 2010 format for now)
+ - [x] Key mapping system
+ - [x] Actually open files in project Files are currently opened in the last used window
+ - [x] CtrlP extension for fuzzy search within the solution Use command :CtrlPCmdSolvent (see above)
+ - [ ] Enable building from Vim using MSBuild (Work in progress)
+ - [ ] Tree coloring
+ - [ ] Persist status in some kind of "<solutionname>.solvent.suo" file
+ - [ ] Unite.vim integration
+ - [ ] Editing of the project/solution (adding/removing files)
+ - [x] Read the available Configurations/Platforms for projects and solution
+ - [ ] Check/Add support for other proj files (C#, VB, and so forth). This seem to already work for most projects types.
+ - [ ] Item properties (i.e. property window)
+ - [ ] Add support for other project formats (e.g. xcodeproj and so forth)
+ - [ ] Support the workflow where the solution tree is shown temporarily in the current buffer instead of another window
+ - [ ] Write vim docs
