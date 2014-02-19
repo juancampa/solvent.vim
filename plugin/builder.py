@@ -1,6 +1,11 @@
 import subprocess
 import sys
 import threading
+import itertools
+import time
+import re, string; 
+import Queue
+from vimutil import VimUtil
 
 class Builder:
     def __init__(self, solution):
@@ -35,17 +40,18 @@ class Builder:
             startupinfo.wShowWindow = 0x00000000 # subprocess.SW_HIDE
 
         try:
-            self.process = subprocess.Popen(args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
+            self.process = subprocess.Popen(args=args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
         except Exception as e:
             self.process = None
-            print "The solution file doesn't seem to have valid solution contents. Aborting."
-            print e
+            VimUtil.Print("Couldn't spawn msbuild process")
+            VimUtil.Print(e)
 
         # Did we succeeded creating the msbuild subprocess?
         if self.process != None:
             # Let a BuildMonitor run on another thread watching the output of msbuild
             self.monitor = _BuildMonitor()
             self.thread = threading.Thread(target=self.monitor.StartMonitoring, args=(self.process,))
+            self.thread.daemon = True    # So this thread dies with vim
             self.thread.start()
 
     def Stop(self):
@@ -63,11 +69,35 @@ class _BuildMonitor:
     def StartMonitoring(self, process):
         """This function monitors the msbuild process, printing from here will sometime produce
            garbage output back in Vim so inter thread synchronization must be used."""
-        print "msbuild pid=" + str(process.pid)
-        print "msbuild returned:" + str(process.returncode)
-        output, error_output = process.communicate()
-        print "msbuild returned:" + str(process.returncode)
-        print 'OUTPUT:'
-        print output
-        print 'ERROR:'
-        print error_output
+
+        VimUtil.Print("msbuild pid=" + str(process.pid))
+
+        queue = Queue.Queue()
+        outIter = _FileMonitor(process.stdout, queue)
+        errIter = _FileMonitor(process.stderr, queue)
+
+        returncode = None
+        output = ""
+        pattern = re.compile('[\W_]+')
+        while returncode == None:
+            try:
+                line = queue.get_nowait()
+                VimUtil.Print(line)
+            except Queue.Empty:
+                time.sleep(1)
+            returncode = process.returncode 
+
+        # Wait for process to terminate
+        VimUtil.Print("msbuild returned:" + str(returncode))
+
+class _FileMonitor:
+    def __init__(self, file, queue):
+        self.thread = threading.Thread(target=self.StartMonitoring, args=(file, queue))
+        self.thread.daemon = True    # So this thread dies with vim
+        VimUtil.Print("Starting thread")
+        self.thread.start()
+
+    def StartMonitoring(self, file, queue):
+        VimUtil.Print("Thread started")
+        for line in iter(file.readline, ''):
+            queue.put(line)

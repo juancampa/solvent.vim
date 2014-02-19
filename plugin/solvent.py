@@ -1,5 +1,8 @@
 import vim
 import os.path
+import threading
+import subprocess
+import sys
 
 # __file__ is not defined by vim for some reason, so do it ourselves.
 __file__ = vim.vars["python_filename"]
@@ -16,8 +19,7 @@ class Solvent:
     @staticmethod
     def StartPlugin(solutionPath):
         """Initializes the plugin, this method should only be called once or bad things might happen?"""
-
-        Solvent.actionMappings = {}
+        Solvent._actionMappings = {}
         
         # Create the solution and the tree view.
         Solvent.solution = Solution(solutionPath)
@@ -56,8 +58,8 @@ class Solvent:
         # VimUtil.Map("i,I,a,A,o,O,r,R,c,C,d,D", "<Esc>", MapScopes.All)
 
         # Default + user defined mappings
-        for k in Solvent.actionMappings.keys():
-            VimUtil.Map(k, ":python Solvent.PerformAction(\"%s\")<Cr>" % Solvent.actionMappings[k], MapScopes.All)
+        for k in Solvent._actionMappings.keys():
+            VimUtil.Map(k, ":python Solvent.PerformAction(\"%s\")<Cr>" % Solvent._actionMappings[k], MapScopes.All)
 
     @staticmethod
     def Build():
@@ -77,7 +79,7 @@ class Solvent:
 
     @staticmethod
     def MapKey(key, actions):
-        Solvent.actionMappings[key] = actions
+        Solvent._actionMappings[key] = actions
 
     @staticmethod
     def PerformAction(actions):
@@ -130,4 +132,6 @@ class Solvent:
         # Open the file
         Solvent.solution.projects[projectIndex].files[fileIndex].PerformAction(Actions.OpenFile)
 
+VimUtil.Init()
 Solvent.StartPlugin(vim.current.buffer.name)
+
