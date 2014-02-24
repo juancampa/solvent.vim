@@ -82,7 +82,7 @@ class Solution(Folder):
         # Read all project configuration/platform data. This is the most bizarre
         # part of an sln file the value after the Build.0 doesn't really mean
         # anything. But if a "Build.0" exists is because the project is selected to
-        # be build under the solution configuration
+        # be built under the solution configuration
         try: 
             block = re.search("GlobalSection\(ProjectConfigurationPlatforms\)\s*=\s*postSolution\s*(.*?)EndGlobalSection", raw, re.DOTALL | re.MULTILINE)
             if block != None:

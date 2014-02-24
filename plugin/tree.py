@@ -1,5 +1,6 @@
 import os.path
 import vim
+from vimutil import VimUtil
 
 # TODO: rename this to TreeAction?
 class Actions:
@@ -67,7 +68,7 @@ class File(TreeNode):
     def PerformAction(self, action):
         if action == Actions.OpenFile:
             if vim.current.window != None and vim.current.window.valid:
-                vim.current.window = Solvent.lastWindow
+                vim.current.window = VimUtil.lastWindow
             vim.command("edit " + os.path.join(self.project.definition.absoluteDirPath, self.relativePath))
 
 

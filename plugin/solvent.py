@@ -12,28 +12,32 @@ from solution import Solution
 from solutionview import SolutionView
 from tree import Actions
 from vimutil import VimUtil, MapScopes
+from outputview import OutputView
 
 class Solvent:
+    """Manages the plugin, keeps the state of the plugin in static variables. (i.e. the current solution
+    is stored in Solvent.solution)"""
     view = None
 
     @staticmethod
-    def StartPlugin(solutionPath):
+    def UseSolution(solutionPath):
         """Initializes the plugin, this method should only be called once or bad things might happen?"""
         Solvent._actionMappings = {}
         
         # Create the solution and the tree view.
         Solvent.solution = Solution(solutionPath)
         Solvent.view = SolutionView(Solvent.solution)
+        Solvent.output = OutputView()
 
+        # Hook to some autocommand we're interested in
         vim.command("augroup Solvent")
         vim.command("autocmd!")
         vim.command("autocmd BufEnter %s* stopinsert" % (Solvent.view.bufferName))
         vim.command("autocmd BufEnter %s* python Solvent.SetKeyBindings()" % (Solvent.view.bufferName))
-        vim.command("autocmd WinLeave * python Solvent.OnWinLeave()")
+        vim.command("autocmd WinLeave * python VimUtil.OnWinLeave()")
         vim.command("augroup END")
 
-        Solvent.view.EnsureOpen()
-        Solvent.view.Render()
+        Solvent.view.Show()
 
         # Default mappings
         Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile,ToggleOption")
@@ -70,12 +74,6 @@ class Solvent:
     def Clean():
         if Solvent.solution.builder != None:
             Solvent.solution.builder.Clean()
-
-    @staticmethod
-    def OnWinLeave():
-        # Keep the last window so when a file is opened we open it there.
-        if Solvent.view != None and Solvent.view.window != vim.current.window:
-            Solvent.lastWindow = vim.current.window
 
     @staticmethod
     def MapKey(key, actions):
@@ -133,5 +131,5 @@ class Solvent:
         Solvent.solution.projects[projectIndex].files[fileIndex].PerformAction(Actions.OpenFile)
 
 VimUtil.Init()
-Solvent.StartPlugin(vim.current.buffer.name)
+Solvent.UseSolution(vim.current.buffer.name)
 

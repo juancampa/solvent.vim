@@ -1,60 +1,22 @@
 import vim
 from vimutil import VimUtil
 from tree import Actions
+from vimview import View
 
-class SolutionView:
+class SolutionView(View):
     """Represents the window in vim where the solution is shown"""
 
     def __init__(self, solution):
-        self.window = None
-        self.buffer = None
+        View.__init__(self)
+
         self.solution = solution
-        self.bufferName = "sln-vim-buffer-name"     # Just some name nobody else would ever use
-        self.defaultBufferWidth = 32
         self.lineToNodeMapping = {}
 
-    def IsOpen(self):
-        """Whether the view is open"""
-        for w in vim.windows:
-            if self.bufferName in w.buffer.name:
-                return w.valid and w.buffer.valid
-        return False
-
-    def EnsureOpen(self):
-        """Ensures that there's a window open and it's associated 
-           with our buffer so we can render to it"""
-        
-        # Make sure there's no previous buffer open
-        for w in vim.windows:
-            if self.bufferName in w.buffer.name:
-                saved = vim.current.window
-                vim.current.window = w
-                vim.command("hide")
-                if saved.valid:                    # We might have closed the saved
-                    vim.current.window = saved
-
-        if (not self.IsOpen()):
-            vim.command(str(self.defaultBufferWidth) + 
-                "vnew " + VimUtil.ConstructPlusCmd([
-                    "set nobuflisted",                  # Don't list this buffer
-                    "set buftype=nofile",               # Not a file buffer (so vim won't try to save)
-                    "set bufhidden=unload",             # Unload when the window closes (we can always create a new one)
-                    "setlocal nowrap",                  # No line wrapping
-                    "setlocal noswapfile",              # No swap file for this buffer
-                    "set filetype=sln-vim",             # Our own filetype
-                    "setlocal nomodifiable",            # Only the plugin can change the contents
-                    "set cursorline",                   # Make vim highlight the whole line
-                    "file %s" % self.bufferName]))      # Set the name so we know how to find it
-
-            # Find our window and buffer
-            for b in vim.buffers:
-                if self.bufferName in b.name:
-                    self.buffer = b
-                    break
-            for w in vim.windows:
-                if w.buffer == b:
-                    self.window = w
-                    break
+        # View settings
+        self.bufferName = "solvent-tree-view"     # Just some name nobody else would ever use
+        self.filetype = "solvent-tree-view"       # This might be useful for autocmd?
+        self.vertical = True
+        self.defaultViewSize = 32
 
     def Render(self):
         """Renders the tree in the current buffer"""
@@ -111,6 +73,9 @@ class SolutionView:
 
     def PerformAction(self, action):
         """Forwards the action to the currently selected node"""
+        print self.window
+        print vim.current.window
+
         assert vim.current.window == self.window
         assert vim.current.buffer == self.buffer
 

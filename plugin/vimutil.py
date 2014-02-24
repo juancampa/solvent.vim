@@ -2,6 +2,7 @@ import vim
 import threading
 import subprocess
 import tempfile
+import sets
 
 class MapScopes:
     Normal = 1
@@ -14,8 +15,16 @@ class MapScopes:
 class VimUtil:
     @staticmethod
     def Init():
+        """Must be called by the plugin during init"""
         VimUtil._printbuffer = []
         VimUtil._lock = threading.RLock()
+
+        # Set of buffer names that belong to the plugin
+        VimUtil._pluginbuffers = sets.Set()
+
+    @staticmethod
+    def DeclarePluginBuffer(name):
+        VimUtil._pluginbuffers.add(name)
 
     @staticmethod
     def ConstructPlusCmd(commands):
@@ -26,12 +35,13 @@ class VimUtil:
 
     @staticmethod
     def Map(keys, mapping, scope):
+        """Conveniently define vim mappings"""
         keys = keys.split(",")
         for i in keys:
-            if MapScopes.Normal | scope: vim.command("nnoremap <buffer> " + i + " " + mapping)
-            if MapScopes.Visual | scope: vim.command("vnoremap <buffer> " + i + " " + mapping)
-            if MapScopes.Select | scope: vim.command("snoremap <buffer> " + i + " " + mapping)
-            if MapScopes.Insert | scope: vim.command("inoremap <buffer> " + i + " " + mapping)
+            if MapScopes.Insert | scope: vim.command("inoremap <silent> <buffer> " + i + " " + mapping)
+            if MapScopes.Visual | scope: vim.command("vnoremap <silent> <buffer> " + i + " " + mapping)
+            if MapScopes.Select | scope: vim.command("snoremap <silent> <buffer> " + i + " " + mapping)
+            if MapScopes.Normal | scope: vim.command("nnoremap <silent> <buffer> " + i + " " + mapping)
 
     @staticmethod
     def GetCursor():
@@ -43,17 +53,20 @@ class VimUtil:
 
     @staticmethod
     def SetCursor(col, pos):
+        """Set the cursor position of the current window"""
         vim.eval("setpos(\".\", [0,%s,%s,0])" % (col, pos))
 
     @staticmethod
     def Print(text):
+        """Thread safe print method, can be used to print from other threads"""
         with VimUtil._lock:
             VimUtil._printbuffer.append(text)
         VimUtil.TriggerUpdate()
 
     @staticmethod
-    def AsyncUpdate():
+    def UpdateAsync():
         with VimUtil._lock:
+            # Print any pending prints
             for i in VimUtil._printbuffer:
                 print i
             del VimUtil._printbuffer[:]
@@ -62,14 +75,26 @@ class VimUtil:
 
     @staticmethod
     def TriggerUpdate():
+        """This method should be called whenever a thread wants the main thread to call UpdateAsync"""
         servername = vim.eval("v:servername")
         startupinfo = subprocess.STARTUPINFO()
         if subprocess.mswindows:
             startupinfo.dwFlags = 0x00000010 | 0x00000001 # CREATE_NEW_CONSOLE | STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 0x00000000 # SW_HIDE
+
         outfile = tempfile.TemporaryFile(mode="w")
         errfile = tempfile.TemporaryFile(mode="w")
         infile = tempfile.TemporaryFile(mode="r")
-        subprocess.Popen(["vim", "--servername", "" + servername + "", "--remote-expr", "pyeval(\"VimUtil.AsyncUpdate()\")"], shell=False, stdout=outfile, stderr=errfile, stdin=infile, startupinfo=startupinfo) 
+        subprocess.Popen(["vim", "--servername", "" + servername + "", "--remote-expr", "pyeval(\"VimUtil.UpdateAsync()\")"], shell=False, stdout=outfile, stderr=errfile, stdin=infile, startupinfo=startupinfo) 
 
-        # TODO: should we delete the tempfiles?
+        # TODO: should we delete the tempfiles? 
+        # TODO: should we reuse them?
+
+    @staticmethod
+    def OnWinLeave():
+        # Keep the last window so when a file is opened we open it there but 
+        # don't use our own windows to open files of course.
+        print vim.current.window.buffer.name
+        if vim.current.window.buffer.name not in VimUtil._pluginbuffers:
+            VimUtil.lastWindow = vim.current.window
+

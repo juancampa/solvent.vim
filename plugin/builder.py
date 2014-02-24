@@ -8,11 +8,11 @@ import Queue
 from vimutil import VimUtil
 
 class Builder:
+    """Manages building a solution by invoking msbuild and monitoring its output"""
     def __init__(self, solution):
         self.solution = solution
 
         self.process = None
-        self.thread = None
         self.monitor = None
 
     def Build(self):
@@ -48,11 +48,8 @@ class Builder:
 
         # Did we succeeded creating the msbuild subprocess?
         if self.process != None:
-            # Let a BuildMonitor run on another thread watching the output of msbuild
+            # Let a BuildMonitor run watch the output of msbuild from another thread
             self.monitor = _BuildMonitor()
-            self.thread = threading.Thread(target=self.monitor.StartMonitoring, args=(self.process,))
-            self.thread.daemon = True    # So this thread dies with vim
-            self.thread.start()
 
     def Stop(self):
         """Stops the current build, if any"""
@@ -63,8 +60,12 @@ class Builder:
         return self.process != None
 
 class _BuildMonitor:
-    def __init__(self):
-        pass
+    """Runs a thread that watches a queue where other two threads put the output of stdout and stderr"""
+    def __init__(self, process):
+        self.process = process
+        self.thread = threading.Thread(target=self.StartMonitoring, args=(process,))
+        self.thread.daemon = True    # So this thread dies with vim
+        self.thread.start()
 
     def StartMonitoring(self, process):
         """This function monitors the msbuild process, printing from here will sometime produce
@@ -72,13 +73,12 @@ class _BuildMonitor:
 
         VimUtil.Print("msbuild pid=" + str(process.pid))
 
+        # Create the two threads that watch the output of msbuild stdout/stderr
         queue = Queue.Queue()
         outIter = _FileMonitor(process.stdout, queue)
         errIter = _FileMonitor(process.stderr, queue)
 
         returncode = None
-        output = ""
-        pattern = re.compile('[\W_]+')
         while returncode == None:
             try:
                 line = queue.get_nowait()
@@ -91,6 +91,8 @@ class _BuildMonitor:
         VimUtil.Print("msbuild returned:" + str(returncode))
 
 class _FileMonitor:
+    """Monitors the provided file (i.e. stdout or stderr of the msbuild process) and copies it to
+    the provided queue"""
     def __init__(self, file, queue):
         self.thread = threading.Thread(target=self.StartMonitoring, args=(file, queue))
         self.thread.daemon = True    # So this thread dies with vim
