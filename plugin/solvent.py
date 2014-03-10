@@ -17,27 +17,27 @@ from outputview import OutputView
 class Solvent:
     """Manages the plugin, keeps the state of the plugin in static variables. (i.e. the current solution
     is stored in Solvent.solution)"""
-    view = None
+    treeview = None
+    outputview = None
 
     @staticmethod
     def UseSolution(solutionPath):
         """Initializes the plugin, this method should only be called once or bad things might happen?"""
         Solvent._actionMappings = {}
         
-        # Create the solution and the tree view.
+        # Create the solution and the tree treeview.
         Solvent.solution = Solution(solutionPath)
-        Solvent.view = SolutionView(Solvent.solution)
-        Solvent.output = OutputView()
+        Solvent.treeview = SolutionView(Solvent.solution)
 
         # Hook to some autocommand we're interested in
         vim.command("augroup Solvent")
         vim.command("autocmd!")
-        vim.command("autocmd BufEnter %s* stopinsert" % (Solvent.view.bufferName))
-        vim.command("autocmd BufEnter %s* python Solvent.SetKeyBindings()" % (Solvent.view.bufferName))
+        vim.command("autocmd BufEnter %s* stopinsert" % (Solvent.treeview.bufferName))
+        vim.command("autocmd BufEnter %s* python Solvent.SetKeyBindings()" % (Solvent.treeview.bufferName))
         vim.command("autocmd WinLeave * python VimUtil.OnWinLeave()")
         vim.command("augroup END")
 
-        Solvent.view.Show()
+        Solvent.treeview.Show()
 
         # Default mappings
         Solvent.MapKey("<CR>",      "ExpandOrCollapse,OpenFile,ToggleOption")
@@ -99,13 +99,13 @@ class Solvent:
             if action == "openfileinhorisplit": actionNum = Actions.OpenFileInHoriSplit
             if action == "toggleoption": actionNum = Actions.ToggleOption
             if actionNum > 0:
-                Solvent.view.PerformAction(actionNum)
+                Solvent.treeview.PerformAction(actionNum)
 
     @staticmethod
     def GetCtrlPFileList():
         """Return the complete list of files to vimscript to be used inside ctrlp"""
         result = []
-        if Solvent.view != None and Solvent.solution != None:
+        if Solvent.treeview != None and Solvent.solution != None:
             for p in Solvent.solution.projects:
                 pid = p.GetProjectId()
                 projectName = p.definition.name

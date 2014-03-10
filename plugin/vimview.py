@@ -8,7 +8,7 @@ class View:
         self.buffer = None
         self.bufferName = "solvent-view"     # Just some name nobody else would ever use
         self.filetype = "solvent-view-ft"     # Just some name nobody else would ever use
-        self.vertical = False
+        self.splitoptions = "vertical topleft"
         self.wrap = False
 
     def IsOpen(self):
@@ -34,11 +34,11 @@ class View:
 
         self.buffer, self.window = self.FindBufferAndWindow()
         if not self.window or not self.window.valid:
-            command = "vnew" if self.vertical else "new"
             wrap = "wrap" if self.wrap else "nowrap"
             vim.command(
-                str(self.defaultViewSize) +         # Window size
-                command + VimUtil.ConstructPlusCmd([
+                self.splitoptions + " " +
+                str(self.defaultViewSize) +"new" +# Window size
+                VimUtil.ConstructPlusCmd([
                 "set nobuflisted",                  # Don't list this buffer
                 "set buftype=nofile",               # Not a file buffer (so vim won't try to save)
                 "set bufhidden=unload",             # Unload when the window closes (we can always create a new one)
@@ -71,4 +71,6 @@ class View:
         return (buffer, window)
 
     def Render(self):
+        print "This method should never be called."
         pass
+

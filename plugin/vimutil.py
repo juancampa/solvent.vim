@@ -17,7 +17,9 @@ class VimUtil:
     def Init():
         """Must be called by the plugin during init"""
         VimUtil._printbuffer = []
+        VimUtil._appendbuffer = []
         VimUtil._lock = threading.RLock()
+        VimUtil._asynccomponents = []
 
         # Set of buffer names that belong to the plugin
         VimUtil._pluginbuffers = sets.Set()
@@ -57,6 +59,12 @@ class VimUtil:
         vim.eval("setpos(\".\", [0,%s,%s,0])" % (col, pos))
 
     @staticmethod
+    def RegisterAsyncComponent(component):
+        assert component != None
+        with VimUtil._lock:
+            VimUtil._asynccomponents.append(component)
+
+    @staticmethod
     def Print(text):
         """Thread safe print method, can be used to print from other threads"""
         with VimUtil._lock:
@@ -70,6 +78,10 @@ class VimUtil:
             for i in VimUtil._printbuffer:
                 print i
             del VimUtil._printbuffer[:]
+
+            # Update any async components
+            for c in VimUtil._asynccomponents:
+                c.UpdateAsync()
 
         return 0
 
@@ -94,7 +106,6 @@ class VimUtil:
     def OnWinLeave():
         # Keep the last window so when a file is opened we open it there but 
         # don't use our own windows to open files of course.
-        print vim.current.window.buffer.name
         if vim.current.window.buffer.name not in VimUtil._pluginbuffers:
             VimUtil.lastWindow = vim.current.window
 
