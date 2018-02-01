@@ -14,7 +14,7 @@ If you work in a team that uses Visual Studio but you want to use vim instead th
 
 ## Status
 
- * **Do not clone yet. This is not ready for use yet but will be soon**
+ * **This project is unmaintained but it's there if you want the code**
  * Shows the solution/projects structure on a side window and let's you explore it
 
 ## Usage
